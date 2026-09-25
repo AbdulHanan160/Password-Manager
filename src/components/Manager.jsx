@@ -1,34 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 
-// Local storage key
-const STORAGE_KEY = "passwords_v1";
-
-// Utility to load entries from localStorage (returns empty array if none)
-const loadEntries = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error("Failed to load entries:", err);
-    return [];
-  }
-};
-
-const saveEntries = (entries) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-  } catch (err) {
-    console.error("Failed to save entries:", err);
-  }
-};
-
 const Manager = () => {
   const [site, setSite] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  const [entries, setEntries] = useState(() => loadEntries());
+  const [entries, setEntries] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [errors, setErrors] = useState({});
 
@@ -36,9 +13,20 @@ const Manager = () => {
   const toastTimerRef = useRef(null);
   const [inputVisible, setInputVisible] = useState(false);
 
+  // Fetch entries from backend on mount
   useEffect(() => {
-    saveEntries(entries);
-  }, [entries]);
+    const fetchEntries = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/passwords');
+        if (!res.ok) throw new Error('Failed to fetch');
+        const data = await res.json();
+        setEntries(data);
+      } catch (err) {
+        console.error('Fetch entries error:', err);
+      }
+    };
+    fetchEntries();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -66,21 +54,36 @@ const Manager = () => {
   const handleSave = (e) => {
     e.preventDefault();
     if (!validate()) return;
-
-    if (editingId) {
-      // Update existing entry
-      setEntries((prev) =>
-        prev.map((item) => (item.id === editingId ? { ...item, site, username, password } : item))
-      );
-      showToast("Password updated");
-    } else {
-      // Create new
-      const id = Date.now().toString();
-      setEntries((prev) => [...prev, { id, site, username, password }]);
-      showToast("Password saved");
-    }
-
-    resetForm();
+    const perform = async () => {
+      try {
+        if (editingId) {
+          const res = await fetch(`http://localhost:5000/api/passwords/${editingId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ site, username, password })
+          });
+          if (!res.ok) throw new Error('Update failed');
+          const updated = await res.json();
+          setEntries((prev) => prev.map((it) => (it.id === editingId ? updated : it)));
+          showToast('Password updated');
+        } else {
+          const res = await fetch('http://localhost:5000/api/passwords', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ site, username, password })
+          });
+          if (!res.ok) throw new Error('Save failed');
+          const created = await res.json();
+          setEntries((prev) => [...prev, created]);
+          showToast('Password saved');
+        }
+        resetForm();
+      } catch (err) {
+        console.error(err);
+        showToast('Server error');
+      }
+    };
+    perform();
   };
 
   const handleEdit = (id) => {
@@ -96,8 +99,18 @@ const Manager = () => {
   const handleDelete = (id) => {
     const ok = window.confirm("Delete this password entry?");
     if (!ok) return;
-    setEntries((prev) => prev.filter((x) => x.id !== id));
-    showToast("Password deleted");
+    const perform = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/passwords/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Delete failed');
+        setEntries((prev) => prev.filter((x) => x.id !== id));
+        showToast('Password deleted');
+      } catch (err) {
+        console.error(err);
+        showToast('Server error');
+      }
+    };
+    perform();
   };
 
   const showToast = (message = "Copied to clipboard!") => {
