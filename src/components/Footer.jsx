@@ -4,7 +4,7 @@ const Footer = () => {
   return (
     <div className="">
       <footer className="bg-[#0a0025] text-white h-[10vh] ]:">
-  <div className=" py-2.5 mx-auto flex items-center sm:flex-row flex-col">
+  <div className=" py-2.5 px-3 mx-auto flex items-center sm:flex-row flex-col">
  <img className="logo-img w-40" src="logo.jpg" alt="Logo" />
 
      <p className="text-sm text-gray-500 sm:ml-4 sm:pl-4 sm:border-l-2 sm:border-gray-200 sm:py-2 sm:mt-0 mt-4">© 2020 Lock Pulse
